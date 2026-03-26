@@ -13,18 +13,20 @@ var migrateCmd = &cobra.Command{
 	Use:   "migrate",
 	Short: "migrate the database",
 	Long:  ``,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		dbURL := viper.GetString("db_url")
-
-		// Run migrations before starting the app logic
-		if err := store.RunMigrations(dbURL); err != nil {
-			return fmt.Errorf("migration failed: %w", err)
-		}
-
-		return nil
-	},
+	RunE:  migrate,
 }
 
 func init() {
 	rootCmd.AddCommand(migrateCmd)
+}
+
+func migrate(cmd *cobra.Command, args []string) error {
+	dbURL := viper.GetString("db_url")
+
+	// Run migrations before starting the app logic
+	if err := store.RunMigrations(dbURL); err != nil {
+		return fmt.Errorf("migration failed: %w", err)
+	}
+
+	return nil
 }

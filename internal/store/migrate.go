@@ -4,11 +4,11 @@ import (
 	"embed"
 	"errors"
 	"fmt"
-	"log"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/rs/zerolog/log"
 )
 
 //go:embed migrations/*.sql
@@ -30,12 +30,12 @@ func RunMigrations(dbURL string) error {
 	// 3. Run 'Up' migrations
 	if err := m.Up(); err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {
-			log.Println("✅ Database schema is up to date.")
+			log.Info().Msg("database schema is up to date")
 			return nil
 		}
 		return fmt.Errorf("failed to run up migrations: %w", err)
 	}
 
-	log.Println("🚀 Migrations applied successfully!")
+	log.Info().Msg("migrations applied successfully")
 	return nil
 }
