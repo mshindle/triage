@@ -1,0 +1,26 @@
+services:
+  signal-api:
+    image: bbernhard/signal-cli-rest-api:latest
+    container_name: signal-api
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - MODE=json-rpc
+    volumes:
+      - signal_storage:/home/.local/share/signal-cli
+  db:
+    image: pgvector/pgvector:pg17 # Using Postgres 17 (Stable in 2026)
+    container_name: triage-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${TRIAGE_DB_USER:-admin}
+      POSTGRES_PASSWORD: ${TRIAGE_DB_PASSWORD:-password123}
+      POSTGRES_DB: ${TRIAGE_DB_NAME:-triage}
+    ports:
+      - "5432:5432"
+    volumes:
+      - triage_storage:/var/lib/postgresql/data
+volumes:
+  signal_storage:
+  triage_storage:
