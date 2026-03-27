@@ -1,0 +1,17 @@
+package templates
+
+import (
+	"github.com/mshindle/triage/internal/store"
+)
+
+templ Dashboard(messages []store.Message) {
+	@layout("Signal AI Triage Dashboard") {
+		<div hx-ext="ws" ws-connect="/ws">
+			<div id="message-stream" class="max-w-4xl mx-auto">
+				for _, msg := range messages {
+					@MessageCard(msg)
+				}
+			</div>
+		</div>
+	}
+}

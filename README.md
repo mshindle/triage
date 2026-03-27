@@ -51,19 +51,36 @@ Spin up the Signal bridge and the vector-enabled database:
 docker-compose up -d
 ```
 ### 2. Configuration
-Create a .env file in the root directory:
-```dotenv
-TRIAGE_DB_URL="postgres://admin:password123@localhost:5432/triage_store?sslmode=disable"
-TRIAGE_SIGNAL_URL="ws://localhost:8080/v1/receive/+1234567890"
-TRIAGE_LLM_KEY="your-api-key"
+Create a triage.yaml file in the root directory:
+```yaml
+database:
+  url: "postgres://admin:password123@localhost:5432/triage_store?sslmode=disable"
+llm:
+  key: "your-api-key"
+log:
+  level: "debug"
+  console: true
+signal:
+  url: "ws://localhost:8080/v1/receive/+1234567890"
 ```
-### 3. Run the migrations if necessary
-The application automatically runs migrations on startup:
+
+### 3. Build and Run
+First, generate the UI components, then build the binary:
 ```bash
-go build -o triage
+# Install templ if you don't have it
+go install github.com/a-h/templ/cmd/templ@latest
+
+# Generate Go code from .templ files
+go generate ./...
+
+# Build the binary
+go build -o triage main.go
+
+# Run migrations and start the server
 ./triage migrate
 ./triage serve
 ```
+
 ## 📂 Project Structure
 ```text
 ├── cmd/                # Cobra command definitions

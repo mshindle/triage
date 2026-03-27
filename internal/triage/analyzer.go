@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/mshindle/triage/internal/config"
+	"github.com/mshindle/triage/internal/store"
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
 	"github.com/openai/openai-go/shared"
@@ -18,20 +21,13 @@ type TriageResult struct {
 	Reasoning string `json:"reasoning"`
 }
 
-type Config struct {
-	APIKey     string
-	Model      string
-	EmbedModel string
-	EmbedDims  int
-}
-
 type Analyzer struct {
 	client *openai.Client
-	cfg    Config
+	cfg    *config.Config
 }
 
-func NewAnalyzer(cfg Config) *Analyzer {
-	client := openai.NewClient(option.WithAPIKey(cfg.APIKey))
+func NewAnalyzer(cfg *config.Config) *Analyzer {
+	client := openai.NewClient(option.WithAPIKey(cfg.LLM.Key))
 	return &Analyzer{
 		client: &client,
 		cfg:    cfg,
@@ -50,7 +46,7 @@ func (a *Analyzer) TriageMessage(ctx context.Context, content string, feedbackCo
 			openai.SystemMessage(systemPrompt),
 			openai.UserMessage(content),
 		},
-		Model: a.cfg.Model,
+		Model: a.cfg.LLM.Model,
 		ResponseFormat: openai.ChatCompletionNewParamsResponseFormatUnion{
 			OfJSONObject: openai.Ptr(shared.NewResponseFormatJSONObjectParam()),
 		},
@@ -78,12 +74,27 @@ func (a *Analyzer) TriageMessage(ctx context.Context, content string, feedbackCo
 	return result, nil
 }
 
+func (a *Analyzer) BuildFeedbackContext(memories []store.FeedbackMemory) string {
+	if len(memories) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	for _, m := range memories {
+		sb.WriteString(fmt.Sprintf("Past correction: %s -> priority %d\n", m.FeedbackText, m.AdjustedPriority))
+	}
+	log.Info().
+		Str("stage", "triage").
+		Int("feedback_count", len(memories)).
+		Msg("feedback context built")
+	return sb.String()
+}
+
 func (a *Analyzer) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
 	start := time.Now()
 	embedding, err := a.client.Embeddings.New(ctx, openai.EmbeddingNewParams{
 		Input:      openai.EmbeddingNewParamsInputUnion{OfString: openai.String(text)},
-		Model:      a.cfg.EmbedModel,
-		Dimensions: openai.Int(int64(a.cfg.EmbedDims)),
+		Model:      a.cfg.LLM.EmbedModel,
+		Dimensions: openai.Int(int64(a.cfg.LLM.EmbedDims)),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("openai embedding failed: %w", err)

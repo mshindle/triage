@@ -21,7 +21,7 @@ func Open(ctx context.Context, dbURL string) (*pgxpool.Pool, error) {
 	}
 
 	// Register pgvector types
-	_, err = pool.Exec(ctx, "SELECT '[]'::vector")
+	_, err = pool.Exec(ctx, "SELECT vector_dims(array_fill(0, ARRAY[768])::vector)")
 	if err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("failed to register pgvector types: %w", err)
