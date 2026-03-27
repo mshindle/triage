@@ -34,7 +34,7 @@ func NewAnalyzer(cfg *config.Config) *Analyzer {
 	}
 }
 
-func (a *Analyzer) TriageMessage(ctx context.Context, content string, feedbackContext string) (TriageResult, error) {
+func (a *Analyzer) TriageMessage(ctx context.Context, signalID, content string, feedbackContext string) (TriageResult, error) {
 	start := time.Now()
 	systemPrompt := "You are a Signal message triage assistant. Output ONLY valid JSON with keys: priority (0-100), category (string), reasoning (string)."
 	if feedbackContext != "" {
@@ -66,6 +66,7 @@ func (a *Analyzer) TriageMessage(ctx context.Context, content string, feedbackCo
 
 	log.Info().
 		Str("stage", "triage").
+		Str("signal_id", signalID).
 		Int64("duration_ms", time.Since(start).Milliseconds()).
 		Int("priority", result.Priority).
 		Str("category", result.Category).
@@ -74,7 +75,8 @@ func (a *Analyzer) TriageMessage(ctx context.Context, content string, feedbackCo
 	return result, nil
 }
 
-func (a *Analyzer) BuildFeedbackContext(memories []store.FeedbackMemory) string {
+func (a *Analyzer) BuildFeedbackContext(signalID string, memories []store.FeedbackMemory) string {
+	start := time.Now()
 	if len(memories) == 0 {
 		return ""
 	}
@@ -84,12 +86,14 @@ func (a *Analyzer) BuildFeedbackContext(memories []store.FeedbackMemory) string 
 	}
 	log.Info().
 		Str("stage", "triage").
+		Str("signal_id", signalID).
+		Int64("duration_ms", time.Since(start).Milliseconds()).
 		Int("feedback_count", len(memories)).
 		Msg("feedback context built")
 	return sb.String()
 }
 
-func (a *Analyzer) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
+func (a *Analyzer) GenerateEmbedding(ctx context.Context, signalID, text string) ([]float32, error) {
 	start := time.Now()
 	embedding, err := a.client.Embeddings.New(ctx, openai.EmbeddingNewParams{
 		Input:      openai.EmbeddingNewParamsInputUnion{OfString: openai.String(text)},
@@ -108,6 +112,7 @@ func (a *Analyzer) GenerateEmbedding(ctx context.Context, text string) ([]float3
 
 	log.Info().
 		Str("stage", "triage").
+		Str("signal_id", signalID).
 		Int64("duration_ms", time.Since(start).Milliseconds()).
 		Msg("embedding generated")
 

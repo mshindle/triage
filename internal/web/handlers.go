@@ -89,15 +89,11 @@ func FeedbackHandler(pool *pgxpool.Pool, hub *Hub, analyzer *triage.Analyzer) ec
 		}
 
 		ctx := c.Request().Context()
-		if err := store.UpdateMessagePriority(ctx, pool, id, adjustedPriority); err != nil {
-			zl.Error().Err(err).Msg("failed to update priority")
-			return ErrInternalServer.WithInternal(err)
-		}
 
-		// Load message to get content for embedding and for rendering
+		// Load message to get SignalID and content
 		messages, err := store.GetMessages(ctx, pool)
 		if err != nil {
-			zl.Error().Err(err).Msg("failed to load message")
+			zl.Error().Err(err).Msg("failed to load messages for feedback")
 			return ErrInternalServer.WithInternal(err)
 		}
 
@@ -114,13 +110,21 @@ func FeedbackHandler(pool *pgxpool.Pool, hub *Hub, analyzer *triage.Analyzer) ec
 			return ErrMessageNotFound
 		}
 
+		if err := store.UpdateMessagePriority(ctx, pool, id, msg.SignalID, adjustedPriority); err != nil {
+			zl.Error().Err(err).Msg("failed to update priority")
+			return ErrInternalServer.WithInternal(err)
+		}
+
+		// Update our local copy for rendering
+		msg.Priority = adjustedPriority
+
 		var embedding []float32
-		embedding, err = analyzer.GenerateEmbedding(ctx, msg.Content)
+		embedding, err = analyzer.GenerateEmbedding(ctx, msg.SignalID, msg.Content)
 		if err != nil {
 			zl.Error().Err(err).Msg("failed to generate embedding for feedback")
 			return ErrInternalServer.WithInternal(fmt.Errorf("failed to generate embedding: %w", err))
 		}
-		if err = store.InsertCorrection(ctx, pool, id, msg.Content, adjustedPriority, embedding); err != nil {
+		if err = store.InsertCorrection(ctx, pool, id, msg.SignalID, msg.Content, adjustedPriority, embedding); err != nil {
 			zl.Error().Err(err).Msg("failed to insert correction")
 		}
 
@@ -175,7 +179,7 @@ func ReplyHandler(pool *pgxpool.Pool, hub *Hub, sender *signal.Sender) echo.Hand
 			return ErrMessageNotFound
 		}
 
-		replyID, err := store.InsertReply(ctx, pool, id, content)
+		replyID, err := store.InsertReply(ctx, pool, id, msg.SignalID, content)
 		if err != nil {
 			zl.Error().Err(err).Msg("failed to insert reply")
 			return ErrInternalServer.WithInternal(err)
@@ -190,7 +194,7 @@ func ReplyHandler(pool *pgxpool.Pool, hub *Hub, sender *signal.Sender) echo.Hand
 			errDetail = err.Error()
 		}
 
-		if err := store.UpdateDeliveryStatus(ctx, pool, replyID, status, errDetail); err != nil {
+		if err := store.UpdateDeliveryStatus(ctx, pool, replyID, msg.SignalID, status, errDetail); err != nil {
 			zl.Error().Err(err).Msg("failed to update delivery status")
 		}
 

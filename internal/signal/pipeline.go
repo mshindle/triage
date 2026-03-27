@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mshindle/triage/internal/store"
@@ -38,10 +39,12 @@ func (p *Pipeline) Listen(ctx context.Context) error {
 }
 
 func (p *Pipeline) handle(env Envelope) {
+	start := time.Now()
 	ctx := context.Background()
 
+	signalID := fmt.Sprintf("%s-%d", env.Source, env.Timestamp)
 	msg := store.Message{
-		SignalID:     fmt.Sprintf("%s-%d", env.Source, env.Timestamp),
+		SignalID:     signalID,
 		SenderPhone:  env.Source,
 		Content:      env.Content,
 		GroupID:      &env.GroupID,
@@ -50,7 +53,7 @@ func (p *Pipeline) handle(env Envelope) {
 
 	id, err := store.InsertMessage(ctx, p.pool, msg)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to insert message")
+		log.Error().Str("signal_id", signalID).Err(err).Msg("failed to insert message")
 		return
 	}
 	if id == 0 {
@@ -58,28 +61,28 @@ func (p *Pipeline) handle(env Envelope) {
 	}
 	msg.ID = id
 
-	embedding, err := p.analyzer.GenerateEmbedding(ctx, env.Content)
+	embedding, err := p.analyzer.GenerateEmbedding(ctx, signalID, env.Content)
 	var feedbackContext string
 	if err != nil {
-		log.Error().Err(err).Msg("failed to generate embedding")
+		log.Error().Str("signal_id", signalID).Err(err).Msg("failed to generate embedding")
 	} else {
-		if err := store.UpdateMessageEmbedding(ctx, p.pool, id, embedding); err != nil {
-			log.Error().Err(err).Msg("failed to update embedding")
+		if err := store.UpdateMessageEmbedding(ctx, p.pool, id, signalID, embedding); err != nil {
+			log.Error().Str("signal_id", signalID).Err(err).Msg("failed to update embedding")
 		}
-		memories, err := store.RecallSimilar(ctx, p.pool, embedding, 5)
+		memories, err := store.RecallSimilar(ctx, p.pool, signalID, embedding, 5)
 		if err != nil {
-			log.Error().Err(err).Msg("failed to recall similar feedback")
+			log.Error().Str("signal_id", signalID).Err(err).Msg("failed to recall similar feedback")
 		} else {
-			feedbackContext = p.analyzer.BuildFeedbackContext(memories)
+			feedbackContext = p.analyzer.BuildFeedbackContext(signalID, memories)
 		}
 	}
 
-	result, err := p.analyzer.TriageMessage(ctx, env.Content, feedbackContext)
+	result, err := p.analyzer.TriageMessage(ctx, signalID, env.Content, feedbackContext)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to triage message")
-		_ = store.UpdateMessageTriage(ctx, p.pool, id, 0, "Unknown", "Triage failed", "failed")
+		log.Error().Str("signal_id", signalID).Err(err).Msg("failed to triage message")
+		_ = store.UpdateMessageTriage(ctx, p.pool, id, signalID, 0, "Unknown", "Triage failed", "failed")
 	} else {
-		_ = store.UpdateMessageTriage(ctx, p.pool, id, result.Priority, result.Category, result.Reasoning, "completed")
+		_ = store.UpdateMessageTriage(ctx, p.pool, id, signalID, result.Priority, result.Category, result.Reasoning, "completed")
 	}
 
 	messages, err := store.GetMessages(ctx, p.pool)
@@ -96,9 +99,15 @@ func (p *Pipeline) handle(env Envelope) {
 
 	var buf bytes.Buffer
 	if err := templates.MessageCard(updatedMsg).Render(ctx, &buf); err != nil {
-		log.Error().Err(err).Msg("failed to render message card")
+		log.Error().Str("signal_id", signalID).Err(err).Msg("failed to render message card")
 		return
 	}
 
 	p.hub.Broadcast([]byte(fmt.Sprintf(`<div hx-swap-oob="afterbegin:#message-stream">%s</div>`, buf.String())))
+
+	log.Info().
+		Str("stage", "pipeline").
+		Str("signal_id", signalID).
+		Int64("duration_ms", time.Since(start).Milliseconds()).
+		Msg("pipeline complete")
 }

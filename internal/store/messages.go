@@ -86,7 +86,7 @@ func GetMessages(ctx context.Context, pool *pgxpool.Pool) ([]Message, error) {
 	return messages, nil
 }
 
-func UpdateMessageTriage(ctx context.Context, pool *pgxpool.Pool, id int64, priority int, category, reasoning, status string) error {
+func UpdateMessageTriage(ctx context.Context, pool *pgxpool.Pool, id int64, signalID string, priority int, category, reasoning, status string) error {
 	start := time.Now()
 	_, err := pool.Exec(ctx,
 		`UPDATE messages
@@ -100,6 +100,7 @@ func UpdateMessageTriage(ctx context.Context, pool *pgxpool.Pool, id int64, prio
 
 	log.Info().
 		Str("stage", "store").
+		Str("signal_id", signalID).
 		Int64("id", id).
 		Int64("duration_ms", time.Since(start).Milliseconds()).
 		Msg("message triage updated")
@@ -107,7 +108,7 @@ func UpdateMessageTriage(ctx context.Context, pool *pgxpool.Pool, id int64, prio
 	return nil
 }
 
-func UpdateMessagePriority(ctx context.Context, pool *pgxpool.Pool, id int64, priority int) error {
+func UpdateMessagePriority(ctx context.Context, pool *pgxpool.Pool, id int64, signalID string, priority int) error {
 	start := time.Now()
 	_, err := pool.Exec(ctx,
 		"UPDATE messages SET priority = $1 WHERE id = $2",
@@ -119,6 +120,7 @@ func UpdateMessagePriority(ctx context.Context, pool *pgxpool.Pool, id int64, pr
 
 	log.Info().
 		Str("stage", "store").
+		Str("signal_id", signalID).
 		Int64("id", id).
 		Int64("duration_ms", time.Since(start).Milliseconds()).
 		Msg("message priority updated")
@@ -126,7 +128,7 @@ func UpdateMessagePriority(ctx context.Context, pool *pgxpool.Pool, id int64, pr
 	return nil
 }
 
-func UpdateMessageEmbedding(ctx context.Context, pool *pgxpool.Pool, id int64, embedding []float32) error {
+func UpdateMessageEmbedding(ctx context.Context, pool *pgxpool.Pool, id int64, signalID string, embedding []float32) error {
 	start := time.Now()
 	_, err := pool.Exec(ctx,
 		"UPDATE messages SET embedding = $1 WHERE id = $2",
@@ -138,6 +140,7 @@ func UpdateMessageEmbedding(ctx context.Context, pool *pgxpool.Pool, id int64, e
 
 	log.Info().
 		Str("stage", "store").
+		Str("signal_id", signalID).
 		Int64("id", id).
 		Int64("duration_ms", time.Since(start).Milliseconds()).
 		Msg("message embedding updated")

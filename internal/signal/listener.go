@@ -95,12 +95,18 @@ func (l *Listener) connectAndRead(ctx context.Context) error {
 		if envelope.Exists() {
 			source := envelope.Get("source").String()
 			timestamp := envelope.Get("timestamp").Int()
+			signalID := fmt.Sprintf("%s-%d", source, timestamp)
 
 			dataMsg := envelope.Get("dataMessage")
 			content := dataMsg.Get("message").String()
 			groupID := dataMsg.Get("groupInfo.groupId").String()
 
 			if content != "" {
+				log.Info().
+					Str("stage", "signal_listener").
+					Str("signal_id", signalID).
+					Msg("message received from bridge")
+
 				l.onMessage(Envelope{
 					Source:    source,
 					Content:   content,

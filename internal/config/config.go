@@ -13,7 +13,7 @@ type Config struct {
 	Signal struct {
 		ReceiveURL string `mapstructure:"receive_url" validate:"required,url"`
 		SendURL    string `mapstructure:"send_url" validate:"required,url"`
-		Phone      string `mapstructure:"phone" validate:"required,phone"`
+		Phone      string `mapstructure:"phone" validate:"required,e164"`
 	} `mapstructure:"signal"`
 
 	Database struct {

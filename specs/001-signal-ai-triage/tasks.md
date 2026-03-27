@@ -99,9 +99,9 @@
 
 **Purpose**: Complete observability, error surfacing, and validate the full system against success criteria.
 
-- [ ] T028 [P] Audit all pipeline stages in `internal/signal/listener.go`, `internal/triage/analyzer.go`, `internal/store/messages.go`, `internal/store/feedback.go`: ensure every function emits a zerolog JSON log line with fields `stage`, `signal_id`, and `duration_ms` (use time.Now() before/after calls) per Constitution Principle V
-- [ ] T029 [P] Add CSS classes to `internal/web/templates/layout.templ` or a static stylesheet: `.priority-high { border-left: 4px solid #dc2626; }` (red), `.priority-medium { border-left: 4px solid #f59e0b; }` (amber), `.priority-low { border-left: 4px solid #16a34a; }` (green), `.triage-failed { border-left: 4px solid #6b7280; opacity: 0.7; }` — verifies SC color-coding requirement
-- [ ] T030 Run `go generate ./... && go build -o triage .` for a clean final build; run `./triage migrate` against a fresh database; run through quickstart.md validation steps end-to-end to confirm all six success criteria (SC-001 through SC-006) are met
+- [x] T028 [P] Audit all pipeline stages in `internal/signal/listener.go`, `internal/triage/analyzer.go`, `internal/store/messages.go`, `internal/store/feedback.go`: ensure every function emits a zerolog JSON log line with fields `stage`, `signal_id`, and `duration_ms` (use time.Now() before/after calls) per Constitution Principle V
+- [x] T029 [P] Add CSS classes to `internal/web/templates/layout.templ` or a static stylesheet: `.priority-high { border-left: 4px solid #dc2626; }` (red), `.priority-medium { border-left: 4px solid #f59e0b; }` (amber), `.priority-low { border-left: 4px solid #16a34a; }` (green), `.triage-failed { border-left: 4px solid #6b7280; opacity: 0.7; }` — verifies SC color-coding requirement
+- [x] T030 Run `go generate ./... && go build -o triage .` for a clean final build; run `./triage migrate` against a fresh database; run through quickstart.md validation steps end-to-end to confirm all six success criteria (SC-001 through SC-006) are met
 
 ---
 

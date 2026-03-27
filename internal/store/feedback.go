@@ -19,7 +19,7 @@ type FeedbackMemory struct {
 	CreatedAt         time.Time
 }
 
-func InsertCorrection(ctx context.Context, pool *pgxpool.Pool, messageID int64, feedbackText string, adjustedPriority int, embedding []float32) error {
+func InsertCorrection(ctx context.Context, pool *pgxpool.Pool, messageID int64, signalID string, feedbackText string, adjustedPriority int, embedding []float32) error {
 	start := time.Now()
 	_, err := pool.Exec(ctx,
 		`INSERT INTO feedback_memory (original_message_id, feedback_text, adjusted_priority, embedding)
@@ -32,6 +32,7 @@ func InsertCorrection(ctx context.Context, pool *pgxpool.Pool, messageID int64, 
 
 	log.Info().
 		Str("stage", "store").
+		Str("signal_id", signalID).
 		Int64("message_id", messageID).
 		Int64("duration_ms", time.Since(start).Milliseconds()).
 		Msg("correction inserted")
@@ -39,7 +40,7 @@ func InsertCorrection(ctx context.Context, pool *pgxpool.Pool, messageID int64, 
 	return nil
 }
 
-func RecallSimilar(ctx context.Context, pool *pgxpool.Pool, queryEmbedding []float32, k int) ([]FeedbackMemory, error) {
+func RecallSimilar(ctx context.Context, pool *pgxpool.Pool, signalID string, queryEmbedding []float32, k int) ([]FeedbackMemory, error) {
 	start := time.Now()
 	rows, err := pool.Query(ctx,
 		`SELECT id, original_message_id, feedback_text, adjusted_priority, embedding, created_at
@@ -67,6 +68,7 @@ func RecallSimilar(ctx context.Context, pool *pgxpool.Pool, queryEmbedding []flo
 
 	log.Info().
 		Str("stage", "store").
+		Str("signal_id", signalID).
 		Int64("duration_ms", time.Since(start).Milliseconds()).
 		Int("count", len(memories)).
 		Msg("similar feedback recalled")
