@@ -58,7 +58,8 @@ func initConfig() {
 	// 1. Set Defaults
 	// This "teaches" Viper that these keys exist so Unmarshal doesn't skip them
 	v.SetDefault("db.url", "postgres://localhost:5432/triage?sslmode=disable")
-	v.SetDefault("signal.url", "ws://localhost:8080/v1/receive/+1234567")
+	v.SetDefault("signal.receive_url", "ws://localhost:8080/v1/receive/+1234567")
+	v.SetDefault("signal.send_url", "http://localhost:8080/v2/send")
 	v.SetDefault("log.level", "info")
 	v.SetDefault("log.console", false)
 	v.SetDefault("llm.key", "supply-a-key")
