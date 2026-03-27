@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/mshindle/triage/internal/signal"
 	"github.com/mshindle/triage/internal/triage"
 	"github.com/rs/zerolog"
 	"github.com/ziflex/lecho/v3"
@@ -17,6 +18,7 @@ type Server struct {
 	pool     *pgxpool.Pool
 	hub      *Hub
 	analyzer *triage.Analyzer
+	sender   *signal.Sender
 }
 
 // Option defines a function which configures the server
@@ -48,6 +50,7 @@ func CreateServer(opts ...Option) *Server {
 	s.router.GET("/", DashboardHandler(s.pool))
 	s.router.GET("/ws", WSHandler(s.hub))
 	s.router.POST("/messages/:id/feedback", FeedbackHandler(s.pool, s.hub, s.analyzer))
+	s.router.POST("/messages/:id/reply", ReplyHandler(s.pool, s.hub, s.sender))
 
 	return s
 }
@@ -81,5 +84,11 @@ func WithHub(hub *Hub) Option {
 func WithAnalyzer(analyzer *triage.Analyzer) Option {
 	return func(s *Server) {
 		s.analyzer = analyzer
+	}
+}
+
+func WithSender(sender *signal.Sender) Option {
+	return func(s *Server) {
+		s.sender = sender
 	}
 }

@@ -11,7 +11,9 @@ import (
 
 type Config struct {
 	Signal struct {
-		URL string `mapstructure:"url" validate:"required,url"`
+		ReceiveURL string `mapstructure:"receive_url" validate:"required,url"`
+		SendURL    string `mapstructure:"send_url" validate:"required,url"`
+		Phone      string `mapstructure:"phone" validate:"required,phone"`
 	} `mapstructure:"signal"`
 
 	Database struct {
@@ -26,7 +28,7 @@ type Config struct {
 	} `mapstructure:"llm"`
 
 	Log struct {
-		Level   string `mapstructure:"level" validate:"oneof=debug info warn error"`
+		Level   string `mapstructure:"level" validate:"oneof=trace debug info warn error"`
 		Console bool   `mapstructure:"console"`
 	} `mapstructure:"log"`
 
@@ -42,13 +44,17 @@ func (c Config) MarshalZerologObject(e *zerolog.Event) {
 		u.User = url.UserPassword(username, "****")
 	}
 
-	e.Dict("signal", zerolog.Dict().Str("url", c.Signal.URL))
+	e.Dict("signal",
+		zerolog.Dict().
+			Str("receive_url", c.Signal.ReceiveURL).
+			Str("send_url", c.Signal.SendURL).
+			Str("phone", c.Signal.Phone))
 	e.Dict("database", zerolog.Dict().Str("url", u.String()))
 	e.Dict("llm", zerolog.Dict().Str("key", fmt.Sprintf("%s...", c.LLM.Key[:5])))
 	e.Dict("log", zerolog.Dict().Str("level", c.Log.Level).Bool("console", c.Log.Console))
 }
 
-func LoadConfig(v *viper.Viper) (*Config, error) {
+func LoadConfig(v *viper.Viper, zl zerolog.Logger) (*Config, error) {
 	var config Config
 
 	// 5. Final Step: Unmarshal into the struct
@@ -63,5 +69,6 @@ func LoadConfig(v *viper.Viper) (*Config, error) {
 		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
 
+	zl.Info().Interface("config", config).Msg("loaded config")
 	return &config, nil
 }

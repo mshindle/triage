@@ -8,6 +8,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
+	"github.com/mshindle/triage/internal/signal"
 	"github.com/mshindle/triage/internal/store"
 	"github.com/mshindle/triage/internal/triage"
 	"github.com/mshindle/triage/internal/web/templates"
@@ -135,5 +136,67 @@ func FeedbackHandler(pool *pgxpool.Pool, hub *Hub, analyzer *triage.Analyzer) ec
 
 		// Return the card as the primary response body for the HTMX swap
 		return c.HTML(http.StatusOK, buf.String())
+	}
+}
+
+func ReplyHandler(pool *pgxpool.Pool, hub *Hub, sender *signal.Sender) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		var zl = zerolog.Ctx(c.Request().Context())
+		ctx := c.Request().Context()
+
+		var id int64
+		err := echo.PathParamsBinder(c).Int64("id", &id).BindError()
+		if err != nil {
+			return ErrInvalidID.WithInternal(err)
+		}
+
+		content := c.FormValue("content")
+		if content == "" {
+			return echo.NewHTTPError(http.StatusBadRequest, "reply content cannot be empty")
+		}
+
+		// Load message to get sender details/group id
+		messages, err := store.GetMessages(ctx, pool)
+		if err != nil {
+			zl.Error().Err(err).Msg("failed to load messages for reply")
+			return ErrInternalServer.WithInternal(err)
+		}
+
+		var msg store.Message
+		found := false
+		for _, m := range messages {
+			if m.ID == id {
+				msg = m
+				found = true
+				break
+			}
+		}
+		if !found {
+			return ErrMessageNotFound
+		}
+
+		replyID, err := store.InsertReply(ctx, pool, id, content)
+		if err != nil {
+			zl.Error().Err(err).Msg("failed to insert reply")
+			return ErrInternalServer.WithInternal(err)
+		}
+
+		err = sender.SendReply(ctx, msg, content)
+		status := "delivered"
+		errDetail := ""
+		if err != nil {
+			zl.Error().Err(err).Msg("failed to send signal reply")
+			status = "failed"
+			errDetail = err.Error()
+		}
+
+		if err := store.UpdateDeliveryStatus(ctx, pool, replyID, status, errDetail); err != nil {
+			zl.Error().Err(err).Msg("failed to update delivery status")
+		}
+
+		if status == "delivered" {
+			return c.HTML(http.StatusOK, `<span class="text-green-600">Delivered</span>`)
+		}
+		return c.HTML(http.StatusOK, fmt.Sprintf(`<span class="text-red-600" title="%s">Failed</span>`, errDetail))
 	}
 }

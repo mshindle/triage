@@ -60,7 +60,8 @@ func (l *Listener) Listen(ctx context.Context) error {
 }
 
 func (l *Listener) connectAndRead(ctx context.Context) error {
-	log.Info().Str("stage", "signal_listener").Str("url", l.wsURL).Msg("connecting to signal bridge")
+	stageLog := log.With().Str("stage", "signal_listener").Logger()
+	stageLog.Info().Str("url", l.wsURL).Msg("connecting to signal bridge")
 
 	c, _, err := websocket.Dial(ctx, l.wsURL, nil)
 	if err != nil {
@@ -68,14 +69,18 @@ func (l *Listener) connectAndRead(ctx context.Context) error {
 	}
 	defer c.Close(websocket.StatusNormalClosure, "")
 
-	log.Info().Str("stage", "signal_listener").Msg("connected to signal bridge")
+	stageLog.Info().Str("log_level", stageLog.GetLevel().String()).Msg("connected to signal bridge")
+	stageLog.Trace().Msg("waiting for messages")
 
 	for {
 		var msg json.RawMessage
-		err := wsjson.Read(ctx, c, &msg)
+		err = wsjson.Read(ctx, c, &msg)
+		stageLog.Debug().Err(err).Msg("wsjson.Read returned")
 		if err != nil {
 			return fmt.Errorf("failed to read message: %w", err)
 		}
+
+		stageLog.Trace().RawJSON("raw", msg).Msg("received message from websocket")
 
 		res := gjson.ParseBytes(msg)
 

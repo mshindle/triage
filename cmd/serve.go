@@ -28,12 +28,16 @@ func init() {
 	rootCmd.AddCommand(serveCmd)
 	serveCmd.Flags().String("listen_addr", ":8081", "address to listen on for the web dashboard")
 	serveCmd.Flags().String("signal_url", "", "Signal bridge WebSocket URL")
+	serveCmd.Flags().String("signal_rest_url", "", "Signal bridge REST API URL")
+	serveCmd.Flags().String("phone", "", "Operator phone number")
 	serveCmd.Flags().String("model", "gpt-4o-mini", "OpenAI model for triage")
 	serveCmd.Flags().String("embed_model", "text-embedding-3-small", "OpenAI model for embeddings")
 	serveCmd.Flags().Int("embed_dims", 768, "Embedding dimensions")
 
 	_ = v.BindPFlag("web.listen_addr", serveCmd.Flags().Lookup("listen_addr"))
 	_ = v.BindPFlag("signal.url", serveCmd.Flags().Lookup("signal_url"))
+	_ = v.BindPFlag("signal.rest_url", serveCmd.Flags().Lookup("signal_rest_url"))
+	_ = v.BindPFlag("signal.phone", serveCmd.Flags().Lookup("phone"))
 	_ = v.BindPFlag("llm.model", serveCmd.Flags().Lookup("model"))
 	_ = v.BindPFlag("llm.embed_model", serveCmd.Flags().Lookup("embed_model"))
 	_ = v.BindPFlag("llm.embed_dims", serveCmd.Flags().Lookup("embed_dims"))
@@ -48,8 +52,11 @@ func runServeCmd(cmd *cobra.Command, _ []string) {
 			},
 			triage.NewAnalyzer,
 			web.NewHub,
-			func(hub *web.Hub, analyzer *triage.Analyzer, pool *pgxpool.Pool, cfg *config.Config) *internalsignal.Pipeline {
-				return internalsignal.NewPipeline(cfg.Signal.URL, pool, hub, analyzer)
+			func(cfg *config.Config) *internalsignal.Sender {
+				return internalsignal.NewSender(cfg.Signal.SendURL, cfg.Signal.Phone)
+			},
+			func(hub *web.Hub, analyzer *triage.Analyzer, pool *pgxpool.Pool, cfg *config.Config) (*internalsignal.Pipeline, error) {
+				return internalsignal.NewPipeline(cfg.Signal.ReceiveURL, pool, hub, analyzer)
 			},
 			fx.Annotate(
 				web.CreateServer,
@@ -59,6 +66,7 @@ func runServeCmd(cmd *cobra.Command, _ []string) {
 			asServerOption(web.WithPool),
 			asServerOption(web.WithHub),
 			asServerOption(web.WithAnalyzer),
+			asServerOption(web.WithSender),
 		),
 		fx.Invoke(startHub),
 		fx.Invoke(startPipeline),
@@ -66,18 +74,18 @@ func runServeCmd(cmd *cobra.Command, _ []string) {
 	).Run()
 }
 
-func startHub(lc fx.Lifecycle, hub *web.Hub) {
+func startHub(lc fx.Lifecycle, ctx context.Context, hub *web.Hub) {
 	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
+		OnStart: func(_ context.Context) error {
 			go hub.Run(ctx)
 			return nil
 		},
 	})
 }
 
-func startPipeline(lc fx.Lifecycle, pipeline *internalsignal.Pipeline) {
+func startPipeline(lc fx.Lifecycle, ctx context.Context, pipeline *internalsignal.Pipeline) {
 	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
+		OnStart: func(_ context.Context) error {
 			go func() {
 				if err := pipeline.Listen(ctx); err != nil && ctx.Err() == nil {
 					log.Error().Err(err).Msg("pipeline listener failed")
@@ -90,7 +98,7 @@ func startPipeline(lc fx.Lifecycle, pipeline *internalsignal.Pipeline) {
 
 func startServer(lc fx.Lifecycle, server *web.Server, cfg *config.Config, zl zerolog.Logger) {
 	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
+		OnStart: func(_ context.Context) error {
 			log.Info().Str("addr", cfg.Web.ListenAddr).Msg("starting web server")
 			go func(address string) {
 				if err := server.Run(address); err != nil && !errors.Is(err, http.ErrServerClosed) {

@@ -8,25 +8,28 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mshindle/triage/internal/store"
 	"github.com/mshindle/triage/internal/triage"
-	"github.com/mshindle/triage/internal/web"
 	"github.com/mshindle/triage/internal/web/templates"
 	"github.com/rs/zerolog/log"
 )
 
+type Broadcaster interface {
+	Broadcast(msg []byte)
+}
+
 type Pipeline struct {
 	pool     *pgxpool.Pool
-	hub      *web.Hub
+	hub      Broadcaster
 	analyzer *triage.Analyzer
 	wsURL    string
 }
 
-func NewPipeline(wsURL string, pool *pgxpool.Pool, hub *web.Hub, analyzer *triage.Analyzer) *Pipeline {
+func NewPipeline(receiveURL string, pool *pgxpool.Pool, hub Broadcaster, analyzer *triage.Analyzer) (*Pipeline, error) {
 	return &Pipeline{
-		wsURL:    wsURL,
+		wsURL:    receiveURL,
 		pool:     pool,
 		hub:      hub,
 		analyzer: analyzer,
-	}
+	}, nil
 }
 
 func (p *Pipeline) Listen(ctx context.Context) error {
