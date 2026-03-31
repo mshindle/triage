@@ -15,16 +15,17 @@ type FeedbackMemory struct {
 	OriginalMessageID int64
 	FeedbackText      string
 	AdjustedPriority  int
+	AdjustedCategory  *string
 	Embedding         []float32
 	CreatedAt         time.Time
 }
 
-func InsertCorrection(ctx context.Context, pool *pgxpool.Pool, messageID int64, signalID string, feedbackText string, adjustedPriority int, embedding []float32) error {
+func InsertCorrection(ctx context.Context, pool *pgxpool.Pool, messageID int64, signalID string, feedbackText string, adjustedPriority int, adjustedCategory *string, embedding []float32) error {
 	start := time.Now()
 	_, err := pool.Exec(ctx,
-		`INSERT INTO feedback_memory (original_message_id, feedback_text, adjusted_priority, embedding)
-		 VALUES ($1, $2, $3, $4)`,
-		messageID, feedbackText, adjustedPriority, pgvector.NewVector(embedding),
+		`INSERT INTO feedback_memory (original_message_id, feedback_text, adjusted_priority, adjusted_category, embedding)
+		 VALUES ($1, $2, $3, $4, $5)`,
+		messageID, feedbackText, adjustedPriority, adjustedCategory, pgvector.NewVector(embedding),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert correction: %w", err)

@@ -1,0 +1,66 @@
+package templates
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/mshindle/triage/internal/store"
+)
+
+// ConvStreamID returns a stable, CSS-selector-safe element ID for a conversation's
+// message stream. Used by handlers and pipeline to target OOB broadcasts.
+// Example: "+12345678901" → "stream-p12345678901", "group:abc" → "stream-group-abc"
+func ConvStreamID(identity string) string {
+	var b strings.Builder
+	b.WriteString("stream-")
+	for _, r := range identity {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+			b.WriteRune(r)
+		case r == '+':
+			b.WriteString("p")
+		default:
+			b.WriteString("-")
+		}
+	}
+	return b.String()
+}
+
+// MessageThread renders the center panel for a selected conversation.
+// replyMap maps message ID → its outgoing replies; lastMsgID is used for the composer.
+templ MessageThread(identity string, messages []store.Message, replyMap map[int64][]store.Reply, lastMsgID int64) {
+	<div class="flex flex-col h-full overflow-hidden">
+		<!-- Thread header -->
+		<div class="px-4 py-3 border-b border-slate-200 bg-white flex-shrink-0">
+			<h2 class="font-semibold text-slate-800 truncate" title={ identity }>{ identity }</h2>
+			<p class="text-xs text-slate-500 mt-0.5">{ fmt.Sprintf("%d messages", len(messages)) }</p>
+		</div>
+		<!-- Message + reply stream — ID is conversation-specific so OOB broadcasts only
+		     land here when this exact conversation is open. -->
+		<div
+			id={ ConvStreamID(identity) }
+			role="log"
+			aria-live="polite"
+			aria-label="Message thread"
+			class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50"
+		>
+			for _, msg := range messages {
+				@messageBubble(msg)
+				for _, reply := range replyMap[msg.ID] {
+					@replyBubble(reply)
+				}
+			}
+			if len(messages) == 0 {
+				<p class="text-center text-slate-400 text-sm py-12">No messages in this conversation</p>
+			}
+		</div>
+		<!-- Reply composer -->
+		if lastMsgID > 0 {
+			@replyComposer(lastMsgID)
+		} else {
+			<div id="reply-composer" class="border-t border-slate-200 bg-white flex-shrink-0 px-4 py-3">
+				<p class="text-xs text-slate-400 text-center italic">No messages to reply to</p>
+			</div>
+		}
+	</div>
+}

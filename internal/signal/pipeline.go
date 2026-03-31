@@ -20,11 +20,11 @@ type Broadcaster interface {
 type Pipeline struct {
 	pool     *pgxpool.Pool
 	hub      Broadcaster
-	analyzer *triage.Analyzer
+	analyzer triage.Analyzer
 	wsURL    string
 }
 
-func NewPipeline(receiveURL string, pool *pgxpool.Pool, hub Broadcaster, analyzer *triage.Analyzer) (*Pipeline, error) {
+func NewPipeline(receiveURL string, pool *pgxpool.Pool, hub Broadcaster, analyzer triage.Analyzer) (*Pipeline, error) {
 	return &Pipeline{
 		wsURL:    receiveURL,
 		pool:     pool,
@@ -81,29 +81,63 @@ func (p *Pipeline) handle(env Envelope) {
 	if err != nil {
 		log.Error().Str("signal_id", signalID).Err(err).Msg("failed to triage message")
 		_ = store.UpdateMessageTriage(ctx, p.pool, id, signalID, 0, "Unknown", "Triage failed", "failed")
+		msg.Priority = 0
+		msg.Category = "Unknown"
+		msg.Reasoning = "Triage failed"
+		msg.TriageStatus = "failed"
 	} else {
 		_ = store.UpdateMessageTriage(ctx, p.pool, id, signalID, result.Priority, result.Category, result.Reasoning, "completed")
+		msg.Priority = result.Priority
+		msg.Category = result.Category
+		msg.Reasoning = result.Reasoning
+		msg.TriageStatus = "completed"
 	}
 
-	messages, err := store.GetMessages(ctx, p.pool)
-	if err != nil {
-		return
+	// Determine the conversation identity for thread targeting.
+	var convIdentity string
+	if env.GroupID != "" {
+		convIdentity = "group:" + env.GroupID
+	} else {
+		convIdentity = env.Source
 	}
-	var updatedMsg store.Message
-	for _, m := range messages {
-		if m.ID == id {
-			updatedMsg = m
-			break
+
+	// Broadcast the new message bubble to clients with this conversation open.
+	// hx-swap-oob silently ignores the target if it doesn't exist in the client DOM.
+	var bubBuf bytes.Buffer
+	if err := templates.MessageBubble(msg).Render(ctx, &bubBuf); err != nil {
+		log.Error().Str("signal_id", signalID).Err(err).Msg("failed to render message bubble for broadcast")
+	} else {
+		streamID := templates.ConvStreamID(convIdentity)
+		oobBubble := fmt.Sprintf(`<div hx-swap-oob="beforeend:#%s">%s</div>`, streamID, bubBuf.String())
+		p.hub.Broadcast([]byte(oobBubble))
+		log.Info().
+			Str("stage", "thread_broadcast").
+			Str("signal_id", signalID).
+			Str("stream_id", streamID).
+			Int64("duration_ms", time.Since(start).Milliseconds()).
+			Msg("message bubble broadcasted to thread")
+	}
+
+	// Fetch the updated conversation list and broadcast an OOB swap for the left panel.
+	// Broadcasts always use the full unfiltered list.
+	convs, err := store.GetConversations(ctx, p.pool, store.ConversationFilters{})
+	if err != nil {
+		log.Error().Str("signal_id", signalID).Err(err).Msg("failed to get conversations for broadcast")
+		// Continue without broadcasting — not fatal.
+	} else {
+		var buf bytes.Buffer
+		if err := templates.ConversationListBroadcast(convs).Render(ctx, &buf); err != nil {
+			log.Error().Str("signal_id", signalID).Err(err).Msg("failed to render conversation list broadcast")
+		} else {
+			p.hub.Broadcast(buf.Bytes())
+			log.Info().
+				Str("stage", "broadcast").
+				Str("signal_id", signalID).
+				Int("conversations", len(convs)).
+				Int64("duration_ms", time.Since(start).Milliseconds()).
+				Msg("conversation list broadcasted")
 		}
 	}
-
-	var buf bytes.Buffer
-	if err := templates.MessageCard(updatedMsg).Render(ctx, &buf); err != nil {
-		log.Error().Str("signal_id", signalID).Err(err).Msg("failed to render message card")
-		return
-	}
-
-	p.hub.Broadcast([]byte(fmt.Sprintf(`<div hx-swap-oob="afterbegin:#message-stream">%s</div>`, buf.String())))
 
 	log.Info().
 		Str("stage", "pipeline").

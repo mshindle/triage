@@ -38,6 +38,37 @@ func InsertReply(ctx context.Context, pool *pgxpool.Pool, messageID int64, signa
 	return id, nil
 }
 
+// GetRepliesByMessageIDs returns all replies for the given message IDs, ordered by creation time.
+func GetRepliesByMessageIDs(ctx context.Context, pool *pgxpool.Pool, messageIDs []int64) ([]Reply, error) {
+	if len(messageIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := pool.Query(ctx,
+		`SELECT id, original_message_id, content, delivery_status, error_detail, created_at
+		 FROM replies
+		 WHERE original_message_id = ANY($1)
+		 ORDER BY created_at ASC`,
+		messageIDs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query replies by message ids: %w", err)
+	}
+	defer rows.Close()
+
+	var replies []Reply
+	for rows.Next() {
+		var r Reply
+		if err := rows.Scan(&r.ID, &r.OriginalMessageID, &r.Content, &r.DeliveryStatus, &r.ErrorDetail, &r.CreatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan reply: %w", err)
+		}
+		replies = append(replies, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("row error in replies: %w", err)
+	}
+	return replies, nil
+}
+
 func UpdateDeliveryStatus(ctx context.Context, pool *pgxpool.Pool, replyID int64, signalID string, status, errDetail string) error {
 	start := time.Now()
 	_, err := pool.Exec(ctx,

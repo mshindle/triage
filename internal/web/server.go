@@ -2,11 +2,13 @@ package web
 
 import (
 	"context"
+	"embed"
+	"io/fs"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/mshindle/triage/internal/signal"
+	"github.com/mshindle/triage/internal/store"
 	"github.com/mshindle/triage/internal/triage"
 	"github.com/rs/zerolog"
 	"github.com/ziflex/lecho/v3"
@@ -17,12 +19,19 @@ type Server struct {
 	logger   zerolog.Logger
 	pool     *pgxpool.Pool
 	hub      *Hub
-	analyzer *triage.Analyzer
-	sender   *signal.Sender
+	analyzer triage.Analyzer
+	sender   Sender
 }
 
 // Option defines a function which configures the server
 type Option func(*Server)
+
+type Sender interface {
+	SendReply(ctx context.Context, msg store.Message, content string) error
+}
+
+//go:embed app/*
+var embeddedFiles embed.FS
 
 func CreateServer(opts ...Option) *Server {
 	s := &Server{
@@ -46,9 +55,18 @@ func CreateServer(opts ...Option) *Server {
 		lecho.Middleware(lecho.Config{Logger: logger}),
 	)
 
+	// configure assets route
+	subFS, err := fs.Sub(embeddedFiles, "app/assets")
+	if err != nil {
+		s.logger.Fatal().Err(err).Msg("failed to load embedded files")
+	}
+	s.router.StaticFS("/assets", subFS)
 	// configure routes
 	s.router.GET("/", DashboardHandler(s.pool))
 	s.router.GET("/ws", WSHandler(s.hub))
+	s.router.GET("/conversations", ConversationListHandler(s.pool))
+	s.router.GET("/conversations/:id/thread", ThreadHandler(s.pool))
+	s.router.GET("/messages/:id/detail", DetailHandler(s.pool))
 	s.router.POST("/messages/:id/feedback", FeedbackHandler(s.pool, s.hub, s.analyzer))
 	s.router.POST("/messages/:id/reply", ReplyHandler(s.pool, s.hub, s.sender))
 
@@ -81,13 +99,13 @@ func WithHub(hub *Hub) Option {
 	}
 }
 
-func WithAnalyzer(analyzer *triage.Analyzer) Option {
+func WithAnalyzer(analyzer triage.Analyzer) Option {
 	return func(s *Server) {
 		s.analyzer = analyzer
 	}
 }
 
-func WithSender(sender *signal.Sender) Option {
+func WithSender(sender Sender) Option {
 	return func(s *Server) {
 		s.sender = sender
 	}

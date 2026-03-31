@@ -1,0 +1,44 @@
+package templates
+
+import "fmt"
+
+// autoGrowTextarea grows the textarea height to fit its content.
+// `this` is the textarea element (called from oninput).
+script autoGrowTextarea() {
+	this.style.height = "auto";
+	this.style.height = (this.scrollHeight) + "px";
+}
+
+// ReplyComposer is the exported wrapper for use by handlers (response body after send).
+templ ReplyComposer(messageID int64) {
+	@replyComposer(messageID)
+}
+
+// replyComposer renders the reply text input at the bottom of a message thread.
+// The form posts to /messages/{messageID}/reply, resets the composer via outerHTML swap.
+templ replyComposer(messageID int64) {
+	<div id="reply-composer" class="border-t border-slate-200 bg-white flex-shrink-0">
+		<form
+			hx-post={ fmt.Sprintf("/messages/%d/reply", messageID) }
+			hx-target="#reply-composer"
+			hx-swap="outerHTML"
+			class="flex items-end gap-2 px-4 py-3"
+		>
+			<textarea
+				name="content"
+				aria-label="Reply"
+				placeholder="Type a reply…"
+				rows="1"
+				class="flex-1 resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 max-h-32 overflow-y-auto"
+				oninput={ autoGrowTextarea() }
+			></textarea>
+			<button
+				type="submit"
+				class="flex-shrink-0 rounded-xl bg-blue-600 text-white px-4 py-2 text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+				aria-label="Send reply"
+			>
+				Send
+			</button>
+		</form>
+	</div>
+}

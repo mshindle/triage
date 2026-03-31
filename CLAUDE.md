@@ -75,6 +75,8 @@ TRIAGE_LLM_KEY="your-api-key"
 ## Active Technologies
 - Go 1.26 (module `github.com/mshindle/triage`) + cobra v1.10.2, viper v1.21.0, golang-migrate v4, openai-go v3, (001-signal-ai-triage)
 - PostgreSQL 17 + pgvector (768-dim embeddings, HNSW indexes) (001-signal-ai-triage)
+- Go 1.26 + Echo v4 (HTTP), coder/websocket v1.8.14, templ v0.3.1001, htmx 2.0 (CDN), Uber Fx v1.24 (existing DI), zerolog v1.34 (002-signal-triage-ui)
+- PostgreSQL 17 + pgvector; no new tables — `messages`, `feedback_memory`, `replies` cover all data needs; one new column via migration 000002 (002-signal-triage-ui)
 
 ## Recent Changes
 - 001-signal-ai-triage: Added Go 1.26 (module `github.com/mshindle/triage`) + cobra v1.10.2, viper v1.21.0, golang-migrate v4, openai-go v3,

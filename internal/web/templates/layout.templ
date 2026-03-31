@@ -2,7 +2,7 @@ package templates
 
 templ layout(title string) {
 	<!DOCTYPE html>
-	<html lang="en">
+	<html lang="en" class="h-full">
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -11,25 +11,82 @@ templ layout(title string) {
 			<script src="https://unpkg.com/htmx-ext-ws@2.0.1/ws.js"></script>
 			<script src="https://cdn.tailwindcss.com"></script>
 			<style>
-				.priority-high { border-left: 4px solid #dc2626; }
-				.priority-medium { border-left: 4px solid #f59e0b; }
-				.priority-low { border-left: 4px solid #16a34a; }
-				.triage-failed { border-left: 4px solid #6b7280; opacity: 0.7; }
+				.priority-high   { border-left: 3px solid #ef4444; }
+				.priority-medium { border-left: 3px solid #f59e0b; }
+				.priority-low    { border-left: 3px solid #22c55e; }
+				.triage-failed   { border-left: 3px solid #6b7280; opacity: 0.7; }
+				.dot-connected    { background-color: #22c55e; }
+				.dot-disconnected { background-color: #ef4444; }
 			</style>
+			<link rel="icon" type="image/svg+xml" href="/assets/images/favicon.svg">
 		</head>
-		<body class="bg-gray-100 font-sans leading-normal tracking-normal">
-			<nav class="bg-white border-b border-gray-200 fixed w-full z-30 top-0">
-				<div class="px-6 py-3">
-					<div class="flex items-center justify-between">
-						<div class="flex items-center justify-start">
-							<span class="text-xl font-bold text-gray-800">Signal AI Triage</span>
-						</div>
+		<body class="h-full flex flex-col bg-slate-50 font-sans">
+			<nav class="bg-white border-b border-slate-200 flex-shrink-0 z-30">
+				<div class="px-4 py-3 flex items-center justify-between">
+					<div class="flex items-center gap-2">
+						<svg class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
+							<path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"/>
+						</svg>
+						<span class="text-lg font-bold text-slate-800">Signal Triage</span>
+					</div>
+					<div class="flex items-center gap-2">
+						<span
+							id="ws-status-dot"
+							class="inline-block w-2.5 h-2.5 rounded-full dot-disconnected transition-colors duration-300"
+							aria-label="WebSocket disconnected"
+							title="Live connection status"
+						></span>
+						<span class="text-xs text-slate-500 select-none">Live</span>
 					</div>
 				</div>
 			</nav>
-			<main class="pt-20 px-6 pb-6">
+			<main class="flex-1 overflow-hidden">
 				{ children... }
 			</main>
+			<script>
+				(function () {
+					var dot = document.getElementById('ws-status-dot');
+
+					function setConnected() {
+						if (!dot) return;
+						dot.classList.remove('dot-disconnected');
+						dot.classList.add('dot-connected');
+						dot.setAttribute('aria-label', 'WebSocket connected');
+					}
+
+					function setDisconnected() {
+						if (!dot) return;
+						dot.classList.remove('dot-connected');
+						dot.classList.add('dot-disconnected');
+						dot.setAttribute('aria-label', 'WebSocket disconnected');
+					}
+
+					// htmx WS extension dispatches these events on the element with ws-connect;
+					// use capture:true so we catch them even if they do not bubble.
+					document.addEventListener('htmx:wsOpen',  setConnected,    true);
+					document.addEventListener('htmx:wsClose', setDisconnected, true);
+					document.addEventListener('htmx:wsError', setDisconnected, true);
+
+					// Page-title badge: increment counter when a high-priority OOB swap arrives.
+					// Broadcasted conversation_item fragments carry data-high-priority="true".
+					document.addEventListener('htmx:oobAfterSwap', function (evt) {
+						var el = evt.detail && evt.detail.fragment;
+						if (!el) return;
+						var target = evt.detail.target;
+						if (target && target.dataset && target.dataset.highPriority === 'true') {
+							var current = document.title;
+							var match = current.match(/^\((\d+)\)\s/);
+							var count = match ? parseInt(match[1], 10) + 1 : 1;
+							document.title = '(' + count + ') Signal Triage';
+						}
+					});
+
+					// Clear title badge when tab regains focus.
+					window.addEventListener('focus', function () {
+						document.title = 'Signal Triage';
+					});
+				})();
+			</script>
 		</body>
 	</html>
 }

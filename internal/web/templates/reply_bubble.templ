@@ -1,0 +1,53 @@
+package templates
+
+import (
+	"fmt"
+
+	"github.com/mshindle/triage/internal/store"
+)
+
+// ReplyBubble is the exported wrapper for use by handlers (OOB broadcast).
+templ ReplyBubble(reply store.Reply) {
+	@replyBubble(reply)
+}
+
+// replyBubble renders an outgoing reply as a right-aligned bubble with delivery status.
+templ replyBubble(reply store.Reply) {
+	<div id={ fmt.Sprintf("reply-%d", reply.ID) } class="flex justify-end">
+		<div class="max-w-[85%] space-y-1">
+			<div class="rounded-2xl rounded-tr-sm bg-blue-600 text-white px-3 py-2 text-sm leading-relaxed break-words">
+				{ reply.Content }
+			</div>
+			<div class="flex items-center justify-end gap-1.5 pr-1">
+				<time
+					class="text-[10px] text-slate-400 tabular-nums"
+					datetime={ reply.CreatedAt.Format("2006-01-02T15:04:05Z07:00") }
+				>
+					{ reply.CreatedAt.Format("15:04") }
+				</time>
+				@replyStatusIcon(reply)
+			</div>
+		</div>
+	</div>
+}
+
+templ replyStatusIcon(reply store.Reply) {
+	if reply.DeliveryStatus == "delivered" {
+		<span class="text-[10px] text-green-600" aria-label="Delivered">✓</span>
+	} else if reply.DeliveryStatus == "failed" {
+		<span
+			class="text-[10px] text-red-500 cursor-help"
+			aria-label={ fmt.Sprintf("Failed: %s", replyErrDetail(reply)) }
+			title={ replyErrDetail(reply) }
+		>✗</span>
+	} else {
+		<span class="text-[10px] text-slate-400" aria-label="Sending">⏳</span>
+	}
+}
+
+func replyErrDetail(reply store.Reply) string {
+	if reply.ErrorDetail != nil {
+		return *reply.ErrorDetail
+	}
+	return "unknown error"
+}

@@ -52,6 +52,23 @@ func InsertMessage(ctx context.Context, pool *pgxpool.Pool, msg Message) (int64,
 	return id, nil
 }
 
+func GetMessageByID(ctx context.Context, pool *pgxpool.Pool, id int64) (Message, error) {
+	var msg Message
+	err := pool.QueryRow(ctx,
+		`SELECT id, signal_id, sender_phone, content, group_id, priority, category, reasoning, triage_status, created_at
+		 FROM messages WHERE id = $1`,
+		id,
+	).Scan(&msg.ID, &msg.SignalID, &msg.SenderPhone, &msg.Content, &msg.GroupID,
+		&msg.Priority, &msg.Category, &msg.Reasoning, &msg.TriageStatus, &msg.CreatedAt)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return Message{}, fmt.Errorf("message not found: %d", id)
+		}
+		return Message{}, fmt.Errorf("failed to get message by id: %w", err)
+	}
+	return msg, nil
+}
+
 func GetMessages(ctx context.Context, pool *pgxpool.Pool) ([]Message, error) {
 	start := time.Now()
 	rows, err := pool.Query(ctx,

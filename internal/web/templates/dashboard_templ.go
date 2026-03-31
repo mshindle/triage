@@ -8,11 +8,9 @@ package templates
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import (
-	"github.com/mshindle/triage/internal/store"
-)
+import "github.com/mshindle/triage/internal/store"
 
-func Dashboard(messages []store.Message) templ.Component {
+func Dashboard(convs []store.ConversationSummary, categories []string, filters store.ConversationFilters) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -45,23 +43,29 @@ func Dashboard(messages []store.Message) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div hx-ext=\"ws\" ws-connect=\"/ws\"><div id=\"message-stream\" class=\"max-w-4xl mx-auto\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div hx-ext=\"ws\" ws-connect=\"/ws\" class=\"flex flex-col h-full overflow-hidden\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			for _, msg := range messages {
-				templ_7745c5c3_Err = MessageCard(msg).Render(ctx, templ_7745c5c3_Buffer)
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
+			templ_7745c5c3_Err = Header(categories, filters).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"flex flex-1 overflow-hidden min-h-0\"><!-- Left panel: Conversation list (280px) --><div class=\"w-[280px] flex-shrink-0 border-r border-slate-200 overflow-hidden bg-slate-50\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = ConversationList(convs, filters).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><!-- Center panel: Message thread (flex-1) --><div id=\"thread-panel\" class=\"flex-1 overflow-hidden bg-white flex items-center justify-center\"><div class=\"text-center\"><div class=\"text-4xl mb-3\">💬</div><p class=\"text-slate-400 text-sm\">Select a conversation</p></div></div><!-- Right panel: Triage detail (360px) --><div id=\"detail-panel\" class=\"w-[360px] flex-shrink-0 border-l border-slate-200 overflow-y-auto bg-white flex items-center justify-center\"><div class=\"text-center\"><div class=\"text-4xl mb-3\">🔍</div><p class=\"text-slate-400 text-sm\">Select a message</p></div></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = layout("Signal AI Triage Dashboard").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = layout("Signal Triage").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

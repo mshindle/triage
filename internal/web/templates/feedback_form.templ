@@ -1,0 +1,132 @@
+package templates
+
+import "fmt"
+
+// setPriorityQuick sets the range slider value and display label to a fixed value.
+script setPriorityQuick(formID, valID string, val int) {
+	document.getElementById(formID).querySelector('[name=priority]').value = val;
+	document.getElementById(valID).textContent = val;
+}
+
+// syncPriorityLabel mirrors the range slider value into the display span.
+// Called from oninput; `this` is the input element.
+script syncPriorityLabel(valID string) {
+	document.getElementById(valID).textContent = this.value;
+}
+
+// feedbackForm renders priority/category correction controls.
+// All controls are disabled when triageStatus != "completed".
+templ feedbackForm(messageID int64, currentPriority int, currentCategory string, categories []string, triageStatus string) {
+	<form
+		id={ fmt.Sprintf("feedback-form-%d", messageID) }
+		hx-post={ fmt.Sprintf("/messages/%d/feedback", messageID) }
+		hx-target="#detail-panel"
+		hx-swap="outerHTML"
+		class="space-y-3"
+	>
+		<!-- Quick-action buttons -->
+		<div class="flex gap-2">
+			<button
+				type="button"
+				class="flex-1 text-xs py-1.5 rounded border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed"
+				onclick={ setPriorityQuick(fmt.Sprintf("feedback-form-%d", messageID), fmt.Sprintf("priority-val-%d", messageID), 85) }
+				if triageStatus != "completed" {
+					disabled
+					aria-disabled="true"
+				}
+			>
+				Mark High (85)
+			</button>
+			<button
+				type="button"
+				class="flex-1 text-xs py-1.5 rounded border border-green-200 text-green-700 bg-green-50 hover:bg-green-100 disabled:opacity-40 disabled:cursor-not-allowed"
+				onclick={ setPriorityQuick(fmt.Sprintf("feedback-form-%d", messageID), fmt.Sprintf("priority-val-%d", messageID), 20) }
+				if triageStatus != "completed" {
+					disabled
+					aria-disabled="true"
+				}
+			>
+				Mark Low (20)
+			</button>
+		</div>
+
+		<!-- Priority slider -->
+		<div class="space-y-1">
+			<div class="flex items-center justify-between">
+				<label for={ fmt.Sprintf("priority-slider-%d", messageID) } class="text-xs text-slate-500">Priority</label>
+				<span id={ fmt.Sprintf("priority-val-%d", messageID) } class="text-xs font-mono font-bold text-slate-700 tabular-nums">
+					{ fmt.Sprintf("%d", currentPriority) }
+				</span>
+			</div>
+			<input
+				type="range"
+				id={ fmt.Sprintf("priority-slider-%d", messageID) }
+				name="priority"
+				min="0"
+				max="100"
+				value={ fmt.Sprintf("%d", currentPriority) }
+				class="w-full h-1.5 accent-slate-600 disabled:opacity-40"
+				oninput={ syncPriorityLabel(fmt.Sprintf("priority-val-%d", messageID)) }
+				if triageStatus != "completed" {
+					disabled
+					aria-disabled="true"
+				}
+			/>
+		</div>
+
+		<!-- Category dropdown -->
+		<div class="space-y-1">
+			<label for={ fmt.Sprintf("category-select-%d", messageID) } class="text-xs text-slate-500 block">Category</label>
+			<select
+				id={ fmt.Sprintf("category-select-%d", messageID) }
+				name="category"
+				class="w-full text-xs rounded border border-slate-200 bg-white py-1 px-2 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+				if triageStatus != "completed" {
+					disabled
+					aria-disabled="true"
+				}
+			>
+				<option value="">— unchanged —</option>
+				for _, cat := range categories {
+					if cat == currentCategory {
+						<option value={ cat } selected>{ cat }</option>
+					} else {
+						<option value={ cat }>{ cat }</option>
+					}
+				}
+			</select>
+		</div>
+
+		<!-- Free-text notes -->
+		<div class="space-y-1">
+			<label for={ fmt.Sprintf("text-feedback-%d", messageID) } class="text-xs text-slate-500 block">Notes (optional)</label>
+			<textarea
+				id={ fmt.Sprintf("text-feedback-%d", messageID) }
+				name="text"
+				rows="2"
+				placeholder="Why are you correcting this?"
+				class="w-full text-xs rounded border border-slate-200 bg-white py-1 px-2 text-slate-700 resize-none disabled:opacity-40 disabled:cursor-not-allowed"
+				if triageStatus != "completed" {
+					disabled
+					aria-disabled="true"
+				}
+			></textarea>
+		</div>
+
+		<!-- Submit -->
+		<button
+			type="submit"
+			class="w-full text-xs py-1.5 rounded bg-slate-800 text-white font-medium hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
+			if triageStatus != "completed" {
+				disabled
+				aria-disabled="true"
+			}
+		>
+			Save Correction
+		</button>
+
+		if triageStatus != "completed" {
+			<p class="text-[10px] text-slate-400 text-center">Feedback available after triage completes</p>
+		}
+	</form>
+}

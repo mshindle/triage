@@ -1,0 +1,56 @@
+package templates
+
+import "fmt"
+
+// priorityGauge renders a full-width progress bar with a large numeric score.
+// priority must be in the range 0–100.
+templ priorityGauge(priority int) {
+	<div class="space-y-1">
+		<div class="flex items-end gap-3">
+			<span class={ "text-3xl font-bold tabular-nums", priorityScoreColor(priority) }>
+				{ fmt.Sprintf("%d", priority) }
+			</span>
+			<span class="text-slate-400 text-sm mb-1">/ 100</span>
+		</div>
+		<div class="h-2 rounded-full bg-slate-200 overflow-hidden" role="progressbar" aria-valuenow={ fmt.Sprintf("%d", priority) } aria-valuemin="0" aria-valuemax="100">
+			<div
+				class={ "h-full rounded-full transition-all duration-300", priorityFillColor(priority) }
+				style={ fmt.Sprintf("width: %d%%", priority) }
+			></div>
+		</div>
+		<p class="sr-only">Priority score: { fmt.Sprintf("%d", priority) } out of 100 — { priorityLabel(priority) }</p>
+	</div>
+}
+
+func priorityFillColor(priority int) string {
+	switch {
+	case priority >= 70:
+		return "bg-red-500"
+	case priority >= 40:
+		return "bg-amber-500"
+	default:
+		return "bg-green-500"
+	}
+}
+
+func priorityScoreColor(priority int) string {
+	switch {
+	case priority >= 70:
+		return "text-red-600"
+	case priority >= 40:
+		return "text-amber-600"
+	default:
+		return "text-green-600"
+	}
+}
+
+func priorityLabel(priority int) string {
+	switch {
+	case priority >= 70:
+		return "High"
+	case priority >= 40:
+		return "Medium"
+	default:
+		return "Low"
+	}
+}

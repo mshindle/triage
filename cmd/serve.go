@@ -11,6 +11,7 @@ import (
 	internalsignal "github.com/mshindle/triage/internal/signal"
 	"github.com/mshindle/triage/internal/store"
 	"github.com/mshindle/triage/internal/triage"
+	triagesignal "github.com/mshindle/triage/internal/triage/signal"
 	"github.com/mshindle/triage/internal/web"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -50,12 +51,21 @@ func runServeCmd(cmd *cobra.Command, _ []string) {
 			func(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 				return store.Open(ctx, cfg.Database.URL)
 			},
-			triage.NewAnalyzer,
+			fx.Annotate(
+				func(cfg *config.Config) *triagesignal.OpenAIAnalyzer {
+					return triagesignal.NewOpenAIAnalyzer(cfg.LLM.Key, cfg.LLM.Model, cfg.LLM.EmbedModel, cfg.LLM.EmbedDims)
+				},
+				fx.As(new(triage.Analyzer)),
+				fx.As(fx.Self()),
+			),
 			web.NewHub,
-			func(cfg *config.Config) *internalsignal.Sender {
-				return internalsignal.NewSender(cfg.Signal.SendURL, cfg.Signal.Phone)
-			},
-			func(hub *web.Hub, analyzer *triage.Analyzer, pool *pgxpool.Pool, cfg *config.Config) (*internalsignal.Pipeline, error) {
+			fx.Annotate(
+				func(cfg *config.Config) *internalsignal.Sender {
+					return internalsignal.NewSender(cfg.Signal.SendURL, cfg.Signal.Phone)
+				},
+				fx.As(new(web.Sender)),
+			),
+			func(hub *web.Hub, analyzer triage.Analyzer, pool *pgxpool.Pool, cfg *config.Config) (*internalsignal.Pipeline, error) {
 				return internalsignal.NewPipeline(cfg.Signal.ReceiveURL, pool, hub, analyzer)
 			},
 			fx.Annotate(

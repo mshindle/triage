@@ -1,0 +1,71 @@
+package templates
+
+import (
+	"fmt"
+
+	"github.com/mshindle/triage/internal/store"
+)
+
+// ConversationList renders the left panel for normal page load and HTMX partial swaps.
+templ ConversationList(convs []store.ConversationSummary, filters store.ConversationFilters) {
+	<div id="conversation-list-panel" class="flex flex-col h-full">
+		@conversationListContent(convs, filters)
+	</div>
+}
+
+// ConversationListBroadcast renders the left panel with an OOB swap attribute
+// for WebSocket broadcasts from the pipeline (always uses full unfiltered list).
+templ ConversationListBroadcast(convs []store.ConversationSummary) {
+	<div id="conversation-list-panel" hx-swap-oob="outerHTML:#conversation-list-panel" class="flex flex-col h-full">
+		@conversationListContent(convs, store.ConversationFilters{})
+	</div>
+}
+
+templ conversationListContent(convs []store.ConversationSummary, filters store.ConversationFilters) {
+	<!-- Search bar -->
+	<div class="p-3 border-b border-slate-200 flex-shrink-0">
+		<input
+			type="search"
+			placeholder="Search conversations…"
+			disabled
+			aria-label="Search conversations (coming soon)"
+			class="w-full px-3 py-1.5 text-sm rounded-md border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
+		/>
+	</div>
+	<!-- Sort + count bar -->
+	<div class="px-3 py-2 border-b border-slate-100 flex items-center justify-between flex-shrink-0">
+		<span class="text-[11px] font-medium text-slate-400 uppercase tracking-wide">
+			{ fmt.Sprintf("%d conversations", len(convs)) }
+		</span>
+		<select
+			name="sort"
+			hx-get="/conversations"
+			hx-target="#conversation-list-panel"
+			hx-swap="outerHTML"
+			hx-include="[name='priority'],[name='category'],[name='status']"
+			hx-push-url="true"
+			hx-trigger="change"
+			class="text-xs text-slate-600 border border-slate-200 rounded px-2 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+			aria-label="Sort conversations"
+		>
+			if filters.Sort == "priority" {
+				<option value="recent">Recent</option>
+				<option value="priority" selected>Priority</option>
+			} else {
+				<option value="recent" selected>Recent</option>
+				<option value="priority">Priority</option>
+			}
+		</select>
+	</div>
+	<!-- Conversation list -->
+	<ul id="conversation-list" role="listbox" aria-label="Conversations" class="flex-1 overflow-y-auto divide-y divide-slate-100">
+		for _, conv := range convs {
+			@conversationItem(conv)
+		}
+		if len(convs) == 0 {
+			<li class="p-8 text-center text-slate-400 text-sm">
+				No conversations yet
+			</li>
+		}
+	</ul>
+}

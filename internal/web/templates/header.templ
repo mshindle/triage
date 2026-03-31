@@ -1,0 +1,143 @@
+package templates
+
+import (
+	"fmt"
+
+	"github.com/mshindle/triage/internal/store"
+)
+
+// clearAllFilters resets all filter inputs in the filter form before the htmx GET fires.
+script clearAllFilters() {
+	var form = document.getElementById("filter-form");
+	form.querySelectorAll("input[type=checkbox]").forEach(function(cb) { cb.checked = false; });
+	form.querySelectorAll("select").forEach(function(sel) { sel.value = ""; });
+}
+
+// Header renders the filter bar below the main nav.
+// categories is the list of known message categories for the dropdown.
+// filters holds the currently active filter/sort state.
+templ Header(categories []string, filters store.ConversationFilters) {
+	<div id="filter-bar" class="bg-white border-b border-slate-100 px-4 py-2 flex-shrink-0 overflow-x-auto">
+		<form id="filter-form" class="flex items-center gap-2 min-w-0">
+			<!-- Priority filter chips -->
+			<span class="text-[11px] font-medium text-slate-500 flex-shrink-0">Priority:</span>
+			for _, p := range []string{"high", "medium", "low"} {
+				<label class={ filterChipClass(isPriorityActive(filters, p)) }>
+					<input
+						type="checkbox"
+						name="priority"
+						value={ p }
+						class="sr-only"
+						if isPriorityActive(filters, p) {
+							checked
+						}
+						hx-get="/conversations"
+						hx-target="#conversation-list-panel"
+						hx-swap="outerHTML"
+						hx-include="[name='priority'],[name='category'],[name='status'],[name='sort']"
+						hx-push-url="true"
+						hx-trigger="change"
+					/>
+					{ filterPriorityLabel(p) }
+				</label>
+			}
+
+			<span class="text-slate-200 select-none flex-shrink-0">|</span>
+
+			<!-- Category filter -->
+			<span class="text-[11px] font-medium text-slate-500 flex-shrink-0">Category:</span>
+			<select
+				name="category"
+				class="text-xs text-slate-600 border border-slate-200 rounded px-2 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+				aria-label="Filter by category"
+				hx-get="/conversations"
+				hx-target="#conversation-list-panel"
+				hx-swap="outerHTML"
+				hx-include="[name='priority'],[name='category'],[name='status'],[name='sort']"
+				hx-push-url="true"
+				hx-trigger="change"
+			>
+				<option value="">All</option>
+				for _, cat := range categories {
+					if cat == filters.Category {
+						<option value={ cat } selected>{ cat }</option>
+					} else {
+						<option value={ cat }>{ cat }</option>
+					}
+				}
+			</select>
+
+			<span class="text-slate-200 select-none flex-shrink-0">|</span>
+
+			<!-- Status filter -->
+			<span class="text-[11px] font-medium text-slate-500 flex-shrink-0">Status:</span>
+			<select
+				name="status"
+				class="text-xs text-slate-600 border border-slate-200 rounded px-2 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
+				aria-label="Filter by status"
+				hx-get="/conversations"
+				hx-target="#conversation-list-panel"
+				hx-swap="outerHTML"
+				hx-include="[name='priority'],[name='category'],[name='status'],[name='sort']"
+				hx-push-url="true"
+				hx-trigger="change"
+			>
+				<option value="">All</option>
+				for _, s := range []string{"completed", "pending", "failed"} {
+					if s == filters.Status {
+						<option value={ s } selected>{ s }</option>
+					} else {
+						<option value={ s }>{ s }</option>
+					}
+				}
+			</select>
+
+			<span class="flex-1"></span>
+
+			<!-- Active filter count + Clear all -->
+			if filters.ActiveCount() > 0 {
+				<span class="text-[10px] text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full flex-shrink-0 tabular-nums">
+					{ fmt.Sprintf("%d active", filters.ActiveCount()) }
+				</span>
+				<a
+					href="#"
+					class="text-[10px] text-slate-400 hover:text-red-500 flex-shrink-0"
+					hx-get="/conversations"
+					hx-target="#conversation-list-panel"
+					hx-swap="outerHTML"
+					hx-push-url="true"
+					onclick={ clearAllFilters() }
+				>Clear all</a>
+			}
+		</form>
+	</div>
+}
+
+func filterChipClass(active bool) string {
+	if active {
+		return "px-2.5 py-1 text-xs rounded-full border cursor-pointer select-none border-blue-400 text-blue-700 bg-blue-50 hover:bg-blue-100"
+	}
+	return "px-2.5 py-1 text-xs rounded-full border cursor-pointer select-none border-slate-200 text-slate-600 bg-white hover:border-slate-300"
+}
+
+func isPriorityActive(filters store.ConversationFilters, priority string) bool {
+	for _, p := range filters.Priority {
+		if p == priority {
+			return true
+		}
+	}
+	return false
+}
+
+func filterPriorityLabel(p string) string {
+	switch p {
+	case "high":
+		return "High"
+	case "medium":
+		return "Medium"
+	case "low":
+		return "Low"
+	default:
+		return p
+	}
+}

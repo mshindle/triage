@@ -1,16 +1,30 @@
 package templates
 
-import (
-	"github.com/mshindle/triage/internal/store"
-)
+import "github.com/mshindle/triage/internal/store"
 
-templ Dashboard(messages []store.Message) {
-	@layout("Signal AI Triage Dashboard") {
-		<div hx-ext="ws" ws-connect="/ws">
-			<div id="message-stream" class="max-w-4xl mx-auto">
-				for _, msg := range messages {
-					@MessageCard(msg)
-				}
+templ Dashboard(convs []store.ConversationSummary, categories []string, filters store.ConversationFilters) {
+	@layout("Signal Triage") {
+		<div hx-ext="ws" ws-connect="/ws" class="flex flex-col h-full overflow-hidden">
+			@Header(categories, filters)
+			<div class="flex flex-1 overflow-hidden min-h-0">
+				<!-- Left panel: Conversation list (280px) -->
+				<div class="w-[280px] flex-shrink-0 border-r border-slate-200 overflow-hidden bg-slate-50">
+					@ConversationList(convs, filters)
+				</div>
+				<!-- Center panel: Message thread (flex-1) -->
+				<div id="thread-panel" class="flex-1 overflow-hidden bg-white flex items-center justify-center">
+					<div class="text-center">
+						<div class="text-4xl mb-3">💬</div>
+						<p class="text-slate-400 text-sm">Select a conversation</p>
+					</div>
+				</div>
+				<!-- Right panel: Triage detail (360px) -->
+				<div id="detail-panel" class="w-[360px] flex-shrink-0 border-l border-slate-200 overflow-y-auto bg-white flex items-center justify-center">
+					<div class="text-center">
+						<div class="text-4xl mb-3">🔍</div>
+						<p class="text-slate-400 text-sm">Select a message</p>
+					</div>
+				</div>
 			</div>
 		</div>
 	}
